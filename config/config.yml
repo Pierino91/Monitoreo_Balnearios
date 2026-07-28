@@ -1,0 +1,158 @@
+# Configuración del Dashboard de Calidad de Agua
+# Resolución 084/SMA - Entre Ríos
+
+# ============================================================================
+# EPICOLLECT5
+# ============================================================================
+
+epicollect5:
+  project_slug: "balnearios-entre-rios"
+  
+  # OAuth2 (solo para proyectos privados)
+  # Dejar vacío si el proyecto es público
+  client_id: ""
+  client_secret: ""
+  
+  # Mapeo de campos del formulario
+  # Ajustar según la estructura real del proyecto
+  mapeo_campos:
+    balneario_id: "1_Balneario_ID"
+    balneario_nombre: "2_Nombre_del_Balneario"
+    municipio: "3_Municipio"
+    lat: "4_Ubicacion.latitude"
+    lon: "4_Ubicacion.longitude"
+    fecha_muestreo: "5_Fecha_de_Muestreo"
+    hora_muestreo: "6_Hora"
+    e_coli: "7_E_coli_UFC_100ml"
+    coliformes_termotolerantes: "8_Coliformes_Termotolerantes_UFC_100ml"
+    temperatura_agua: "9_Temperatura_Agua_C"
+    ph: "10_pH"
+    lluvias_previas: "11_Lluvias_72h_Previas"
+    altura_rio: "12_Altura_Rio_cm"
+
+# ============================================================================
+# NORMATIVA - RESOLUCIÓN 084/SMA
+# ============================================================================
+
+normativa:
+  # Límites microbiológicos (Art. 8)
+  limites:
+    e_coli:
+      media_geometrica: 300  # UFC/100ml
+      valor_critico: 800     # UFC/100ml
+    
+    coliformes_termotolerantes:
+      media_geometrica: 600  # UFC/100ml
+      valor_critico: 1000    # UFC/100ml
+  
+  # Parámetros de cálculo
+  ventana_temporal_dias: 30
+  minimo_muestras: 5
+  
+  # Umbrales de alerta (% del límite)
+  umbral_alerta_porcentaje: 90
+
+# ============================================================================
+# SISTEMA DE SEMÁFORO
+# ============================================================================
+
+semaforo:
+  colores:
+    verde: "#28a745"
+    amarillo: "#ffc107"
+    rojo: "#dc3545"
+    sin_datos: "#999999"
+  
+  iconos:
+    verde: "🟢"
+    amarillo: "🟡"
+    rojo: "🔴"
+    sin_datos: "⚪"
+
+# ============================================================================
+# DASHBOARD
+# ============================================================================
+
+dashboard:
+  # Modo de operación
+  # "produccion" | "desarrollo"
+  modo: "desarrollo"
+  
+  # Actualización automática
+  intervalo_actualizacion_segundos: 3600  # 1 hora
+  
+  # Mapa
+  mapa:
+    centro_lat: -31.8
+    centro_lon: -58.2
+    zoom_inicial: 8
+    provider_tiles:
+      - "CartoDB.Positron"
+      - "Esri.WorldImagery"
+  
+  # Visualización
+  filas_por_pagina: 25
+  idioma: "es"
+
+# ============================================================================
+# VALIDACIONES
+# ============================================================================
+
+validaciones:
+  # Rangos aceptables
+  e_coli:
+    min: 0
+    max: 10000
+    alerta_extremo: 5000
+  
+  coliformes_termotolerantes:
+    min: 0
+    max: 20000
+    alerta_extremo: 10000
+  
+  ph:
+    min: 4.0
+    max: 10.0
+  
+  temperatura_agua:
+    min: 0
+    max: 45
+
+# ============================================================================
+# NOTIFICACIONES (Futuro)
+# ============================================================================
+
+notificaciones:
+  enabled: false
+  email:
+    destinatarios:
+      - "laboratorio@entrerios.gov.ar"
+      - "ambiente@entrerios.gov.ar"
+    smtp_server: "smtp.entrerios.gov.ar"
+    smtp_port: 587
+  
+  disparadores:
+    - "balneario_rojo"
+    - "multiples_excedencias"
+    - "falta_datos"
+
+# ============================================================================
+# EXPORTACIÓN
+# ============================================================================
+
+exportacion:
+  formatos_disponibles:
+    - csv
+    - xlsx
+  
+  incluir_metadatos: true
+  encoding: "UTF-8"
+
+# ============================================================================
+# LOGGING
+# ============================================================================
+
+logging:
+  nivel: "INFO"  # DEBUG | INFO | WARNING | ERROR
+  archivo: "logs/dashboard.log"
+  rotacion: "diaria"
