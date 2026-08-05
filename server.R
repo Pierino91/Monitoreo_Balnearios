@@ -14,35 +14,41 @@ server <- function(input, output, session) {
       
       incProgress(0.3, detail = "Conectando con Epicollect5...")
       
+      datos <- NULL
+      
       if (MODO == "produccion") {
-        # Producción: datos reales
-        tryCatch({
-          if(APPS){
-          datos <- cargar_datos_epicollect5(
+        
+        datos <- tryCatch({
+          
+          cargar_datos_epicollect5(
             project_slug = EPICOLLECT_PROJECT,
-            client_id = EPICOLLECT_CLIENT_ID,
-            client_secret = EPICOLLECT_CLIENT_SECRET
+            client_entries = EPICOLLECT_ENTRIES,
+            client_branch = EPICOLLECT_BRANCH_ANALISIS
           )
-          }else{
-            datos <- cargar_datos_epicollect5(
-              project_slug = EPICOLLECT_PROJECT,
-              client_entries = EPICOLLECT_ENTRIES,
-              client_branch = EPICOLLECT_BRANCH_ANALISIS
-            )
-          }
+          
         }, error = function(e) {
+          
           showNotification(
             paste("Error al cargar datos:", e$message),
             type = "error",
             duration = 10
           )
+          
+          NULL
         })
+        
       } else {
-        # Desarrollo: datos simulados
-        datos <- simular_datos_desarrollo(n_balnearios = 8, n_muestras_por_balneario = 40)
+        
+        datos <- simular_datos_desarrollo(
+          n_balnearios = 8,
+          n_muestras_por_balneario = 40
+        )
+        
       }
       
-      incProgress(0.6, detail = "Procesando datos...")
+      if (is.null(datos)) {
+        return()
+      }
       
       datos_base(datos)
       
@@ -73,7 +79,7 @@ server <- function(input, output, session) {
       if (MODO == "produccion") {
         datos <- cargar_datos_epicollect5(
           client_entries = EPICOLLECT_ENTRIES,
-          client_branch = EPICOLLECT_BRANCH
+          client_branch = list(EPICOLLECT_BRANCH_ANALISIS, EPICOLLECT_BRANCH_PROCEDIMIENTO)
         )
       } else {
         datos <- simular_datos_desarrollo(n_balnearios = 8, n_muestras_por_balneario = 40)
@@ -98,7 +104,7 @@ server <- function(input, output, session) {
       # Solo en producción
       datos <- cargar_datos_epicollect5(
         client_entries = EPICOLLECT_ENTRIES,
-        client_branch = EPICOLLECT_BRANCH_ANALISIS
+        client_branch = list(EPICOLLECT_BRANCH_ANALISIS, EPICOLLECT_BRANCH_PROCEDIMIENTO)
       )
       
       datos_base(datos)
@@ -148,10 +154,11 @@ server <- function(input, output, session) {
   })
   
   clasificacion_filtrada <- reactive({
+    
     req(clasificacion_actual(), datos_filtrados())
     
     # balnearios_filtrados <- unique(datos_filtrados()$balneario_id)
-    
+    # 
     # clasificacion_actual() %>%
     #   filter(balneario_id %in% balnearios_filtrados)
     

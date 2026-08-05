@@ -1,8 +1,7 @@
 #' Funciones Normativas - Resolución 084 SMA Entre Ríos
 #' Cálculos de medias geométricas y validación de cumplimiento
 
-library(dplyr)
-library(lubridate)
+
 
 #' Calcular media geométrica con validaciones
 #' 

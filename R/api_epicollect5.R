@@ -5,9 +5,10 @@
 library(httr)
 library(jsonlite)
 library(dplyr)
+library(tidyr)
 library(lubridate)
 library(purrr)
-
+library(roxygen2)
 
 
 # ----------- FUNCIONES DE CARGA DE DATOS API ----------- #
@@ -23,271 +24,21 @@ obtener_datos <- function(url) {
   }
 }
 
-obtener_todas_entradas <- function(base_url) {
-  
-  all_entries <- tibble()  # Inicializar el tibble vacío
-  all_lugar <- tibble()    # Inicializar el tibble para coordenadas si existen
-  
-  # Obtener el primer conjunto de datos
-  operarios_crudo_get <- obtener_datos(base_url)
-  # operarios_crudo_get <- obtener_datos(EPICOLLECT_ENTRIES)
-  # operarios_crudo_get <- obtener_datos(EPICOLLECT_BRANCH_PROCEDIMIENTO)
-  
-  
-  while (!is.null(operarios_crudo_get$links$self)) {
-    
-    if (!is.null(operarios_crudo_get$data$entries)) {
-      
-      # Convertir a tibble
-      entries <- as_tibble(operarios_crudo_get$data$entries)
-      
-      # Convertir todas las columnas numéricas a character
-      entries <- entries %>%
-        mutate(across(where(is.numeric), as.character))
-      
-      # Detectar si hay una columna con datos de ubicación y procesarla
-      
-      col_lugar <- names(entries)[
-        sapply(entries, function(x) {
-          is.list(x) &&
-            length(x) > 0 &&
-            all(c("latitude","longitude","accuracy") %in% names(x[[1]]))
-        })
-      ]
-      
-      if (length(col_lugar) > 0) {
-        
-        lugar_df <- entries |>
-          dplyr::pull(col_lugar[1]) |>
-          purrr::map_dfr(~tibble::tibble(
-            latitude  = .x$latitude,
-            longitude = .x$longitude,
-            accuracy  = .x$accuracy
-          ))
-        
-      }
-  
-      # Acumular los datos
-      all_entries <- bind_rows(all_entries, entries)
-    }
-    
-    # Obtener el siguiente enlace
-    next_link <- operarios_crudo_get$links$`next`
-    
-    # Si no hay más páginas, salir del bucle
-    if (is.null(next_link)) {
-      break
-    }
-    
-    # Obtener el siguiente conjunto de datos
-    operarios_crudo_get <- obtener_datos(next_link)
-    Sys.sleep(1)
-  }
-  
-  # Retornar los datos combinados si existe información de ubicación
-  if (nrow(all_lugar) > 0) {
-    return(cbind(all_entries, all_lugar))
-  } else {
-    return(all_entries)
-  }
-}
 
-unir_entries_branch <- function(
-    datos_entries,
-    datos_branch){
-  
-  datos_proc <-
-    datos_entries %>%
-    merge(datos_branch, by.y ="ec5_branch_owner_uuid", by.x="ec5_uuid") 
-  
-  # head(datos_proc)
-  
-  return(datos_proc)
-}
-
-################# OBTENER DATOS CON API#################
-
-#' Obtener datos desde Epicollect5
-#' 
-#' @param project_slug Nombre del proyecto en Epicollect5
-#' @param form_ref Referencia del formulario (default: NULL usa primer form)
-#' @param client_id Client ID para autenticación (opcional)
-#' @param client_secret Client Secret para autenticación (opcional)
-#' 
-#' @return Data frame con datos crudos
-#' 
-# obtener_datos_epicollect5 <- function(project_slug, 
-#                                       form_ref = NULL,
-#                                       client_id = NULL,
-#                                       client_secret = NULL) {
-#   
-#   # URL base de la API
-#   base_url <- "https://five.epicollect.net/api/export/entries"
-#   
-#   # Construir URL
-#   url <- paste0(base_url, "/", project_slug)
-#   
-#   # Parámetros de consulta
-#   query_params <- list(
-#     per_page = 1000,  # Máximo permitido
-#     page = 1
-#   )
-#   
-#   if (!is.null(form_ref)) {
-#     query_params$form_ref <- form_ref
-#   }
-#   
-#   # Headers
-#   headers <- c(
-#     "Accept" = "application/json"
-#   )
-#   
-#   # Si hay credenciales, obtener token OAuth2
-#   if (!is.null(client_id) && !is.null(client_secret)) {
-#     token <- obtener_token_oauth2(client_id, client_secret)
-#     headers <- c(headers, "Authorization" = paste("Bearer", token))
-#   }
-#   
-#   # Inicializar lista para almacenar datos
-#   todos_los_datos <- list()
-#   pagina_actual <- 1
-#   
-#   message(sprintf("Descargando datos del proyecto: %s", project_slug))
-#   
-#   # Paginación
-#   repeat {
-#     
-#     query_params$page <- pagina_actual
-#     
-#     # Realizar request
-#     response <- tryCatch({
-#       GET(
-#         url = url,
-#         query = query_params,
-#         add_headers(.headers = headers),
-#         timeout(30)
-#       )
-#     }, error = function(e) {
-#       stop(sprintf("Error de conexión: %s", e$message))
-#     })
-#     
-#     # Verificar status
-#     if (status_code(response) != 200) {
-#       stop(sprintf(
-#         "Error en API Epicollect5 (código %d): %s",
-#         status_code(response),
-#         content(response, "text", encoding = "UTF-8")
-#       ))
-#     }
-#     
-#     # Parsear JSON
-#     datos_json <- content(response, "text", encoding = "UTF-8")
-#     datos_lista <- fromJSON(datos_json, flatten = TRUE)
-#     
-#     # Extraer entries
-#     if (is.null(datos_lista$data$entries) || length(datos_lista$data$entries) == 0) {
-#       break  # No hay más datos
-#     }
-#     
-#     todos_los_datos[[pagina_actual]] <- datos_lista$data$entries
-#     
-#     message(sprintf("  Página %d descargada: %d registros", 
-#                     pagina_actual, 
-#                     nrow(datos_lista$data$entries)))
-#     
-#     # Verificar si hay más páginas
-#     if (is.null(datos_lista$links$`next`) || datos_lista$links$`next` == "") {
-#       break
-#     }
-#     
-#     pagina_actual <- pagina_actual + 1
-#     
-#     # Pausa cortés entre requests
-#     Sys.sleep(0.5)
-#   }
-#   
-#   # Combinar todas las páginas
-#   if (length(todos_los_datos) == 0) {
-#     stop("No se obtuvieron datos del proyecto")
-#   }
-#   
-#   df_completo <- bind_rows(todos_los_datos)
-#   
-#   message(sprintf("✓ Total descargado: %d registros", nrow(df_completo)))
-#   
-#   return(df_completo)
-# }
-
-obtener_datos_epicollect5 <- function(client_entries,
-                                      client_branch = NULL) {
-  
-  df_entries <- obtener_todas_entradas(client_entries)
-  
-  if(!is.null(client_branch)){
-    
-    df_branch <- obtener_todas_entradas(client_branch)
-    
-    message(sprintf("✓ Total descargado: %d registros", nrow(df_entries)))
-    message(sprintf("✓ Total descargado: %d branch", nrow(df_branch)))
-    
-    return(unir_entries_branch(df_entries,df_branch))
-  }else{
-    message(sprintf("✓ Total descargado: %d registros", nrow(df_entries)))
-    return(df_entries)
-    
-  }
-  
-}
-
-#' Wrapper completo: obtener y procesar datos
-#' 
 #' @param project_slug Nombre del proyecto
 #' @param mapeo_campos Mapeo personalizado (opcional)
 #' @param client_id Client ID OAuth2 (opcional)
 #' @param client_secret Client Secret OAuth2 (opcional)
 #' @return Data frame limpio listo para análisis
 #' 
-# cargar_datos_epicollect5 <- function(project_slug,
-#                                      mapeo_campos = NULL,
-#                                      client_id = NULL,
-#                                      client_secret = NULL) {
-#   
-#   
-#   # Obtener datos crudos
-#   df_raw <- obtener_datos_epicollect5(
-#     project_slug = project_slug,
-#     client_id = client_id,
-#     client_secret = client_secret
-#   )
-#   
-#   # Procesar
-#   df_limpio <- procesar_datos_epicollect5(df_raw, mapeo_campos)
-#   
-#   # Validar
-#   source("R/normativa.R")
-#   df_validado <- validar_datos_entrada(df_limpio)
-#   
-#   # Reporte de calidad
-#   n_invalidos <- sum(!df_validado$registro_valido)
-#   if (n_invalidos > 0) {
-#     warning(sprintf(
-#       "⚠ %d registros inválidos encontrados (%.1f%%)",
-#       n_invalidos,
-#       n_invalidos / nrow(df_validado) * 100
-#     ))
-#   }
-#   
-#   return(df_validado)
-# }
-
-
-cargar_datos_epicollect5 <- function(client_entries = NULL,
-                                     client_branch = NULL) {
+cargar_datos_epicollect5 <- function(client_entries,
+                                     client_branch,
+                                     verbose = TRUE) {
   # Obtener datos crudos
   if(!is.null(client_branch)){
     df_raw <- obtener_datos_epicollect5(
       client_entries = client_entries,
-      client_branch = client_branch
+      client_branch = list(client_branch)
     )
   }else{
     df_raw <- obtener_datos_epicollect5(
@@ -295,15 +46,26 @@ cargar_datos_epicollect5 <- function(client_entries = NULL,
       client_branch = NULL
     )
   }
-
+  
   # Procesar
+  if(verbose){
+    message("PROCESAR")
+    cat(colnames(df_raw))
+  }
   df_limpio <- procesar_datos_epicollect5(df_raw)
   
   # Validar
-  source("R/normativa.R")
+  if(verbose){
+    message("VALIDAR")
+    cat(colnames(df_limpio))
+  }
   df_validado <- validar_datos_entrada(df_limpio)
   
   # Reporte de calidad
+  if(verbose){
+    message("REPORTE DE CALIDAD")
+    cat(colnames(df_validado))
+  }
   n_invalidos <- sum(!df_validado$registro_valido)
   if (n_invalidos > 0) {
     warning(sprintf(
@@ -314,6 +76,331 @@ cargar_datos_epicollect5 <- function(client_entries = NULL,
   }
   
   return(df_validado)
+}
+
+
+#' Obtener y Consolidar Datos de Formulario Principal y Subformularios (Branches) de Epicollect5
+#'
+#' @description
+#' Descarga los registros principales de un formulario de Epicollect5 y realiza la unión 
+#' secuencial con $N$ subformularios o branches pasados como lista o vector.
+#'
+#' @param client_entries \code{character} o \code{list}. Cadena de texto, URL o lista de parámetros 
+#'   que identifica las entradas del formulario principal de Epicollect5.
+#' @param client_branch \code{character}, \code{vector} o \code{list}, opcional. Identificador(es) 
+#'   de uno o más subformularios/branches. Si es \code{NULL} o está vacío, únicamente se retornan 
+#'   las entradas del formulario principal. Por defecto es \code{NULL}.
+#' @param verbose \code{logical}. Si es \code{TRUE}, muestra en consola los mensajes de progreso 
+#'   y diagnóstico de columnas (útil para depuración). Por defecto es \code{FALSE}.
+#'
+#' @return Un \code{tibble} o \code{data.frame} consolidado que contiene los datos del formulario 
+#'   principal unidos (\code{left_join}) con todos los subformularios/branches procesados.
+#'
+#' @details
+#' La función orquesta el proceso en cuatro pasos principales:
+#' \enumerate{
+#'   \item Descarga las entradas del formulario principal mediante \code{obtener_todas_entradas()}.
+#'   \item Aplana el argumento \code{client_branch} para admitir múltiples estructuras (\code{list} o \code{c()}).
+#'   \item Iterativamente descarga cada subformulario/branch y efectúa la unión relacional mediante \code{unir_entries_branch()}.
+#'   \item Controla de forma defensiva los branches vacíos o nulos para evitar interrupciones en la ejecución.
+#' }
+#'
+#' @import dplyr
+#'
+#' @examples
+#' \dontrun{
+#' # Descargar solo formulario principal
+#' df_main <- obtener_datos_epicollect5(client_entries = "mi_form_ref")
+#'
+#' # Descargar principal y múltiples branches
+#' df_completo <- obtener_datos_epicollect5(
+#'   client_entries = "mi_form_ref",
+#'   client_branch  = c("branch_laboratorio", "branch_campo"),
+#'   verbose        = TRUE
+#' )
+#' }
+#'
+#' @export
+obtener_datos_epicollect5 <- function(client_entries,
+                                      client_branch = NULL,
+                                      verbose = FALSE) {
+  
+  # 1. Obtener entradas del formulario principal
+  df_entries <- obtener_todas_entradas(client_entries)
+  
+  if (is.null(df_entries) || nrow(df_entries) == 0) {
+    warning("⚠ No se obtuvieron registros del formulario principal.")
+    return(df_entries)
+  }
+  
+  if (verbose) {
+    message(sprintf("✓ Total descargado principal: %d registros", nrow(df_entries)))
+  }
+  
+  # 2. Si no hay branches pasadas como argumento, retornar entradas principales
+  if (is.null(client_branch) || length(client_branch) == 0) {
+    return(df_entries)
+  }
+  
+  # 3. Aplanar la lista/vector para soportar list() o vector c()
+  branches_lista <- unlist(client_branch)
+  
+  if (verbose) {
+    message(sprintf("✓ Branches a procesar (%d): %s", 
+                    length(branches_lista), 
+                    paste(branches_lista, collapse = ", ")))
+  }
+  
+  df_resultado <- df_entries
+  total_branches_descargadas <- 0
+  
+  # 4. Iterar dinámicamente sobre cada branch recibida
+  for (branch in branches_lista) {
+    
+    df_branch <- obtener_todas_entradas(branch)
+    
+    if (!is.null(df_branch) && nrow(df_branch) > 0) {
+      total_branches_descargadas <- total_branches_descargadas + nrow(df_branch)
+      
+      if (verbose) {
+        message(sprintf("  -> Uniendo branch con %d registros...", nrow(df_branch)))
+        message("Branch colnames: ")
+        print(colnames(df_branch))
+        
+      }
+      
+      # Unir recursivamente la branch con el data frame acumulado
+      df_resultado <- unir_entries_branch(df_resultado, df_branch)
+    } else if (verbose) {
+      message(sprintf("  ⚠ La branch '%s' está vacía o es nula. Se omite el cruce.", branch))
+    }
+  }
+  
+  if (verbose) {
+    message(sprintf("✓ Total acumulado descargado en branches: %d registros", total_branches_descargadas))
+    message(sprintf("✓ Total de columnas finales: %d", ncol(df_resultado)))
+  }
+  
+  return(df_resultado)
+}
+
+#' Obtener todas las entradas de una URL/Ref de Epicollect5 y desempaquetar ubicación
+#'
+#' @description
+#' Pagina automáticamente sobre todas las respuestas de la API de Epicollect5, 
+#' convierte los tipos de datos numéricos a character de forma segura y desanida
+#' las estructuras complejas de geolocalización (\code{latitude}, \code{longitude}, \code{accuracy}).
+#'
+#' @param base_url Carácter. URL completa, slug o referencia endpoint de la API.
+#' @param verbose \code{logical}. Si es \code{TRUE}, imprime el avance de la paginación y el listado de columnas. Por defecto es \code{FALSE}.
+#'
+#' @return Un \code{tibble} con todos los registros parseados y las coordenadas desanidadas en caso de existir.
+#' @export
+obtener_todas_entradas <- function(base_url, verbose = FALSE) {
+  
+  all_entries <- dplyr::tibble()  # Inicializar el tibble vacío
+
+  # Obtener el primer conjunto de datos
+  operarios_crudo_get <- obtener_datos(base_url)
+  pagina <- 1
+  
+  while (!is.null(operarios_crudo_get$links$self)) {
+    
+    if (!is.null(operarios_crudo_get$data$entries)) {
+      
+      # Convertir a tibble
+      entries <- tibble::as_tibble(operarios_crudo_get$data$entries)
+      
+      # Convertir todas las columnas numéricas a character para evitar inconsistencias
+      entries <- entries %>%
+        dplyr::mutate(dplyr::across(dplyr::where(is.numeric), as.character))
+      
+      # Detectar si hay columnas con datos de ubicación (listas anidadas)
+      if (verbose) {
+        tipos_vars_entries <- sapply(entries, class)
+        # Retorna un vector con los nombres de las columnas que son data frames/listas
+        entries_desglosado<-desglosar_columnas_nested(entries)
+        tipos_vars_entries_desglosado <- sapply(entries_desglosado, class)
+        
+      }
+      
+      entries_desglosado<-desglosar_columnas_nested(entries)
+
+      # Acumular los datos principales
+      all_entries <- dplyr::bind_rows(all_entries, entries_desglosado)
+      
+      if (verbose) {
+        message(sprintf("   Página %d procesada (%d registros acumulados)", pagina, nrow(all_entries)))
+      }
+    }
+    
+    # Obtener el siguiente enlace de paginación
+    next_link <- operarios_crudo_get$links$`next`
+    
+    if (is.null(next_link)) {
+      break
+    }
+    
+    pagina <- pagina + 1
+    operarios_crudo_get <- obtener_datos(next_link)
+    Sys.sleep(1)
+  }
+  
+  # Reporte de diagnóstico solo si verbose = TRUE
+  if (verbose) {
+    message("\n--- Tipo de variable de 'tipos_vars_entries' ---")
+    print(tipos_vars_entries)
+    message("\n--- Tipo de variable de 'tipos_vars_entries_desglosado' ---")
+    print(tipos_vars_entries_desglosado)
+    message("--- Nombres de 'all_entries' (Ordenados) ---")
+    print(sort(names(all_entries)))
+  }
+  
+  # Retornar los datos combinados si existe información de ubicación desanidada
+  return(all_entries)
+}
+
+#' Desglosar y Aplanar Columnas Anidadas en un Data Frame / Tibble
+#'
+#' @description
+#' Detecta automáticamente las columnas dentro de un `data.frame` o `tibble` que 
+#' contengan estructuras de datos anidadas (como `data.frame` internos o listas 
+#' de `data.frame` provenientes de APIs o respuestas JSON) y las alana/desanida 
+#' de forma segura y defensiva.
+#'
+#' @details
+#' La función realiza dos pasos principales:
+#' 1. **Detección Dinámica:** Evalúa cada columna para verificar si sus elementos 
+#'    son de clase `data.frame` o si contiene listas cuyos elementos internos 
+#'    son data frames (común en subformularios *branches* de Epicollect5 o APIs REST).
+#' 2. **Desanidado Seguro:** Filtra registros nulos (`NULL`) para prevenir errores de 
+#'    memoria o tipos de datos, y aplica `tidyr::unnest()` resolviendo duplicados de 
+#'    nombres de columnas con `names_repair = "unique"` y preservando filas vacías 
+#'    con `keep_empty = TRUE`.
+#'
+#' @param df Un `data.frame` o `tibble` que puede contener una o más columnas anidadas (*list-columns*).
+#'
+#' @return Un `tibble` desglosado con las columnas internas aplanadas al nivel principal.
+#'
+#' @keywords manipulación-datos api epicollect5 unnest tidyverse
+#'
+#' @export
+#'
+#' @examples
+#' \link{dontrun}{
+#'   # Ejemplo de uso con datos que contienen subformularios/branches
+#'   df_procesado <- desglosar_columnas_nested(entries_raw)
+#' }
+#' 
+desglosar_columnas_nested <- function(df) {
+  
+  # Validar que el argumento recibido sea un data.frame o tibble
+  if (!is.data.frame(df)) {
+    stop("El parámetro 'df' debe ser un data.frame o tibble.")
+  }
+  
+  # ----------------------------------------------------------------------------
+  # Paso 1: Detección automática de columnas anidadas
+  # ----------------------------------------------------------------------------
+  # Se mapea cada columna para verificar si:
+  # - La columna en sí es un data.frame anidado.
+  # - O la columna es una lista que contiene data.frames dentro de sus elementos.
+  cols_nested <- names(df)[map_lgl(df, function(col_data) {
+    is.data.frame(col_data) || 
+      (is.list(col_data) && any(map_lgl(col_data, is.data.frame)))
+  })]
+  
+  # Retorno temprano si no hay columnas anidadas que procesar
+  if (length(cols_nested) == 0) {
+    message("ℹ No se encontraron columnas anidadas con Data Frames.")
+    return(df)
+  }
+  
+  message(sprintf("✓ Columnas anidadas detectadas: %s", paste(cols_nested, collapse = ", ")))
+  
+  # ----------------------------------------------------------------------------
+  # Paso 2: Desanidado dinámico y seguro de cada columna
+  # ----------------------------------------------------------------------------
+  df_desglosado <- df
+  
+  for (col in cols_nested) {
+    df_desglosado <- df_desglosado %>% 
+      # Elimina elementos NULL en la columna anidada para evitar excepciones al desanidar
+      filter(!map_lgl(.data[[col]], is.null)) %>% 
+      # Desanida expandiendo filas y columnas
+      # - names_repair = "unique": evita errores si hay nombres de columnas duplicados entre el padre y el hijo
+      # - keep_empty = TRUE: conserva filas de la tabla padre aunque el hijo no tenga datos (asigna NA)
+      unnest(cols = all_of(col), names_repair = "unique", keep_empty = TRUE)
+  }
+  
+  return(df_desglosado)
+}
+
+#' Unir Entradas Principales con Subformulario (Branch) de Epicollect5
+#'
+#' @description
+#' Realiza una unión relacional (\code{left_join}) entre el data frame de entradas 
+#' principales y un subformulario/branch. Limpia automáticamente columnas de auditoría
+#' duplicadas y reporta detalles del proceso si se activa \code{verbose}.
+#'
+#' @param datos_entries \code{data.frame} o \code{tbl_df}. Entradas principales con la columna \code{ec5_uuid}.
+#' @param datos_branch \code{data.frame} o \code{tbl_df}. Datos del subformulario con la columna \code{ec5_branch_owner_uuid}.
+#' @param verbose \code{logical}. Si es \code{TRUE}, imprime los detalles de la unión y columnas excluidas. Por defecto es \code{FALSE}.
+#'
+#' @return Un \code{tibble} resultante del cruce relacional.
+#' @export
+#' 
+unir_entries_branch <- function(datos_entries, datos_branch, verbose = FALSE) {
+  
+  # 1. Validaciones defensivas iniciales
+  if (is.null(datos_entries) || nrow(datos_entries) == 0) {
+    if (verbose) message("⚠ 'datos_entries' está vacío o es NULL. Se retorna 'datos_branch'.")
+    return(datos_branch)
+  }
+  
+  if (is.null(datos_branch) || nrow(datos_branch) == 0) {
+    if (verbose) message("⚠ 'datos_branch' está vacío o es NULL. Se retorna 'datos_entries'.")
+    return(datos_entries)
+  }
+  
+  # 2. Verificar existencia de las llaves relacionales
+  if (!"ec5_uuid" %in% names(datos_entries)) {
+    stop("❌ Error: 'ec5_uuid' no existe en datos_entries.")
+  }
+  
+  if (!"ec5_branch_owner_uuid" %in% names(datos_branch)) {
+    stop("❌ Error: 'ec5_branch_owner_uuid' no existe en datos_branch.")
+  }
+  
+  # 3. Evitar duplicidad de columnas administrativas (sufijos .x y .y)
+  cols_repetidas <- intersect(names(datos_entries), names(datos_branch))
+  cols_a_excluir <- setdiff(cols_repetidas, "ec5_branch_owner_uuid")
+  
+  if (length(cols_a_excluir) > 0) {
+    if (verbose) {
+      message(sprintf("ℹ Excluyendo %d columnas duplicadas del branch para evitar sufijos: %s", 
+                      length(cols_a_excluir), 
+                      paste(cols_a_excluir, collapse = ", ")))
+    }
+    datos_branch <- datos_branch %>% 
+      dplyr::select(-dplyr::all_of(cols_a_excluir))
+  }
+  
+  # 4. Unión relacional
+  if (verbose) {
+    message(sprintf("🔄 Uniendo entries (%d filas) con branch (%d filas)...", 
+                    nrow(datos_entries), nrow(datos_branch)))
+  }
+  
+  datos_proc <- datos_entries %>%
+    dplyr::left_join(datos_branch, by = c("ec5_uuid" = "ec5_branch_owner_uuid"))
+  
+  if (verbose) {
+    message(sprintf("✓ Unión completada: %d filas y %d columnas finales.", 
+                    nrow(datos_proc), ncol(datos_proc)))
+  }
+  
+  return(datos_proc)
 }
 
 
@@ -347,58 +434,6 @@ obtener_token_oauth2 <- function(client_id, client_secret) {
 }
 
 
-#' Mapear campos de Epicollect5 a esquema interno
-#' 
-#' @param df_raw Data frame crudo de Epicollect5
-#' @param mapeo_campos Lista con mapeo de nombres de campos
-#' @return Data frame normalizado
-#' 
-mapear_campos_epicollect5 <- function(df_raw, mapeo_campos = NULL) {
-  
-  # Mapeo default (ajustar según estructura real del proyecto)
-  if (is.null(mapeo_campos)) {
-    mapeo_campos <- list(
-      agente="2_Agente_responsable",
-      balneario_nombre = "3_Balneario",
-      lat = "lat_4_Localizacion",
-      lon = "long_4_Localizacion",
-      fecha_muestreo = "8_Fecha_Muestra",
-      coliformes_termotolerantes = "8_Coliformes_totales",
-      e_coli = "9_E_Coli"
-      
-      # balneario_id = "1_Balneario_ID",
-      # municipio = "3_Municipio",
-      # hora_muestreo = "6_Hora",
-      # temperatura_agua = "9_Temperatura_Agua_C",
-      # ph = "10_pH",
-      # lluvias_previas = "11_Lluvias_72h_Previas",
-      # altura_rio = "12_Altura_Rio_cm"
-      
-    )
-  }
-  
-  # Crear data frame mapeado
-  df_mapeado <- df_raw
-  
-  for (campo_interno in names(mapeo_campos)) {
-    campo_epicollect <- mapeo_campos[[campo_interno]]
-    
-    if (campo_epicollect %in% names(df_raw)) {
-      df_mapeado[[campo_interno]] <- df_raw[[campo_epicollect]]
-    } else {
-      warning(sprintf("Campo '%s' no encontrado en datos de Epicollect5", campo_epicollect))
-      df_mapeado[[campo_interno]] <- NA
-    }
-  }
-  
-  # Seleccionar solo campos mapeados
-  df_mapeado <- df_mapeado %>%
-    select(all_of(names(mapeo_campos)))
-  
-  return(df_mapeado)
-}
-
-
 #' Procesar y limpiar datos de Epicollect5
 #' 
 #' @param df_raw Data frame crudo de Epicollect5
@@ -406,10 +441,22 @@ mapear_campos_epicollect5 <- function(df_raw, mapeo_campos = NULL) {
 #' @return Data frame limpio y tipado
 #' 
 
-procesar_datos_epicollect5 <- function(df_raw, mapeo_campos = NULL) {
+procesar_datos_epicollect5 <- function(df_raw, mapeo_campos = NULL, verbose = TRUE) {
+  
+  if(verbose){
+    message("🔄 nombres de las variables antes de er mapeadas")
+    print(sort(colnames(df_raw)))
+    
+  }
   
   # Mapear campos
   df <- mapear_campos_epicollect5(df_raw, mapeo_campos)
+  
+  if(verbose){
+    message("🔄 nombres de las variables luego de er mapeadas")
+    print(sort(colnames(df)))
+
+  }
   
   # Limpiar y tipar
   df <- df %>%
@@ -446,6 +493,96 @@ procesar_datos_epicollect5 <- function(df_raw, mapeo_campos = NULL) {
   
 }
 
+#' Mapear campos de Epicollect5 a esquema interno
+#' 
+#' @param df_raw Data frame crudo de Epicollect5
+#' @param mapeo_campos Lista con mapeo de nombres de campos
+#' @return Data frame normalizado
+#' 
+
+mapear_campos_epicollect5 <- function(df_raw, mapeo_campos = NULL, Verbose = TRUE) {
+  
+  # Mapeo default (ajustar según estructura real del proyecto)
+ 
+  if (is.null(mapeo_campos)) {
+    mapeo_campos <- list(
+      agente="2_Agente_responsable",
+      balneario_nombre = "3_Balneario",
+      actividad = "4_Qu_actividad_va_a_",
+      analisis_agua = "5_Anlisis_de_aguas_b",
+      fecha_muestreo = "7_Fecha",
+      N_muestra = "8_Nmero_de_muestra",
+      coliformes_termotolerantes = "9_Coliformes_totales",
+      e_coli = "10_E_Coli",
+      imagenes = "11_ImagenDelAnalisis",
+      procesamiento= "12_Procedimiento_par",
+      num_analisis= "14_Nmero_de_anlisis",
+      altura_rio_cm= "16_Altura_del_ro_cm",
+      altura_rio="17_Altura_del_ro",
+      lat = "latitude",
+      lon = "longitude"
+      
+      
+      # balneario_id = "1_Balneario_ID",
+      # municipio = "3_Municipio",
+      # hora_muestreo = "6_Hora",
+      # temperatura_agua = "9_Temperatura_Agua_C",
+      # ph = "10_pH",
+      # lluvias_previas = "11_Lluvias_72h_Previas",
+      # altura_rio = "12_Altura_Rio_cm"
+      
+    )
+  }
+  
+  # Crear data frame mapeado
+  df_mapeado <- df_raw
+  message("Clase de mapeo_campos: ", class(mapeo_campos))
+  message("Longitud: ", length(mapeo_campos))
+  message("Nombres de mapeo_campos: ", paste(names(mapeo_campos), collapse = ", "))
+  Verbose <- FALSE
+  for ( campo_interno in names(mapeo_campos)) {
+    campo_epicollect <- mapeo_campos[[campo_interno]]
+
+    if(Verbose){
+      message("--- FLAG Nombres de mapeo_campos[[campo_interno]] y campo_epicollect,---")
+      cat(campo_interno, sep = "\n")
+      cat(campo_epicollect, sep = "\n")
+    }
+    
+    if (campo_epicollect %in% names(df_raw)) {
+      df_mapeado[[campo_interno]] <- df_raw[[campo_epicollect]]
+    } else {
+      warning(sprintf("Campo '%s' no encontrado en datos de Epicollect5", campo_epicollect))
+      df_mapeado[[campo_interno]] <- NA
+    }
+    
+  }
+  
+  # Seleccionar solo campos mapeados
+  df_mapeado <- df_mapeado %>%
+    select(all_of(names(mapeo_campos)))
+  
+  if(Verbose){
+    message("--- FLAG Nombres de df_mapeado ---")
+    cat(class(df_mapeado), sep = "\n")
+    cat(str(df_mapeado), sep = "\n")
+  }
+  
+  # Seleccionar únicamente las columnas mapeadas válidas
+  df_mapeado <- df_mapeado %>%
+    select(any_of(names(mapeo_campos)))
+  
+  # Garantizar la existencia de columnas críticas con valores por defecto si no están
+  cols_obligatorias <- c("balneario_id", "municipio", "estado", "lat", "lon")
+  
+  for (col in cols_obligatorias) {
+    if (!col %in% names(df_mapeado)) {
+      df_mapeado[[col]] <- NA
+    }
+  }
+  
+  return(df_mapeado)
+}
 
 
 #' Simular datos para desarrollo/testing
@@ -454,6 +591,7 @@ procesar_datos_epicollect5 <- function(df_raw, mapeo_campos = NULL) {
 #' @param n_muestras_por_balneario Muestras por balneario
 #' @return Data frame simulado
 #' 
+
 simular_datos_desarrollo <- function(n_balnearios = 5, n_muestras_por_balneario = 30) {
   
   set.seed(42)

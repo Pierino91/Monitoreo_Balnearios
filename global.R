@@ -26,9 +26,9 @@ EPICOLLECT_BRANCH_ANALISIS <- "https://five.epicollect.net/api/export/entries/ag
 EPICOLLECT_BRANCH_PROCEDIMIENTO <- "https://five.epicollect.net/api/export/entries/aguas-recreativas-parana?form_ref=0644b69a5e6e43f58e30699b127ee59c_6989c7775da43&branch_ref=0644b69a5e6e43f58e30699b127ee59c_6989c7775da43_69984a61d5f08"
 
 # TODO APPS en desarrollo
+VERBOSE <- TRUE
 APPS <- FALSE
 INTERVALO_ACTUALIZACION <- 3600  # segundos
-
 # ---- MÓDULOS ----
 source("R/api_epicollect5.R")
 source("R/normativa.R")
