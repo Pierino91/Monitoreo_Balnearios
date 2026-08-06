@@ -33,7 +33,7 @@ obtener_datos <- function(url) {
 #' 
 cargar_datos_epicollect5 <- function(client_entries,
                                      client_branch,
-                                     verbose = TRUE) {
+                                     verbose = FALSE) {
   # Obtener datos crudos
   if(!is.null(client_branch)){
     df_raw <- obtener_datos_epicollect5(
@@ -50,7 +50,9 @@ cargar_datos_epicollect5 <- function(client_entries,
   # Procesar
   if(verbose){
     message("PROCESAR")
-    cat(colnames(df_raw))
+    # cat(colnames(df_raw))
+    cat(str(df_raw))
+    
   }
   df_limpio <- procesar_datos_epicollect5(df_raw)
   
@@ -441,11 +443,11 @@ obtener_token_oauth2 <- function(client_id, client_secret) {
 #' @return Data frame limpio y tipado
 #' 
 
-procesar_datos_epicollect5 <- function(df_raw, mapeo_campos = NULL, verbose = TRUE) {
+procesar_datos_epicollect5 <- function(df_raw, mapeo_campos = NULL, verbose = FALSE) {
   
   if(verbose){
     message("🔄 nombres de las variables antes de er mapeadas")
-    print(sort(colnames(df_raw)))
+    cat(sort(colnames(df_raw)))
     
   }
   
@@ -453,43 +455,21 @@ procesar_datos_epicollect5 <- function(df_raw, mapeo_campos = NULL, verbose = TR
   df <- mapear_campos_epicollect5(df_raw, mapeo_campos)
   
   if(verbose){
-    message("🔄 nombres de las variables luego de er mapeadas")
-    print(sort(colnames(df)))
-
+    message("🔄 nombres de las variables luego de mapear_campos_epicollect5")
+    cat(sort(colnames(df)))
   }
   
-  # Limpiar y tipar
-  df <- df %>%
-    mutate(
-      # Fechas
-      fecha_muestreo = as.Date(fecha_muestreo),
-      
-      # Numéricos
-      e_coli = as.numeric(e_coli),
-      coliformes_termotolerantes = as.numeric(coliformes_termotolerantes),
-      # temperatura_agua = as.numeric(temperatura_agua),
-      # ph = as.numeric(ph),
-      lat = as.numeric(lat),
-      lon = as.numeric(lon),
-      # altura_rio = as.numeric(altura_rio),
-      
-      # Caracteres
-      # balneario_id = as.character(balneario_id),
-      balneario_nombre = as.character(balneario_nombre),
-
-      # Temporada (calculada)
-      temporada = case_when(
-        month(fecha_muestreo) %in% c(12, 1, 2, 3) ~ "Verano",
-        TRUE ~ "Resto del año"
-      )
-    ) %>%
-    # Remover duplicados exactos
-      mutate(ID = row_number()
-      )
+  df_raw <- union_tipeo_mapa_datos(df)
   
-  message(sprintf("✓ Datos procesados: %d registros únicos", nrow(df)))
+  if(verbose){
+    message("🔄 nombres de las variables luego de union_tipeo_mapa_datos")
+    cat(sort(colnames(df_raw)))
+  }
   
-  return(df)
+  
+  message(sprintf("✓ Datos procesados: %d registros únicos", nrow(df_raw)))
+  
+  return(df_raw)
   
 }
 
@@ -500,29 +480,33 @@ procesar_datos_epicollect5 <- function(df_raw, mapeo_campos = NULL, verbose = TR
 #' @return Data frame normalizado
 #' 
 
-mapear_campos_epicollect5 <- function(df_raw, mapeo_campos = NULL, Verbose = TRUE) {
+mapear_campos_epicollect5 <- function(df_raw, mapeo_campos = NULL, Verbose = FALSE) {
   
   # Mapeo default (ajustar según estructura real del proyecto)
  
   if (is.null(mapeo_campos)) {
     mapeo_campos <- list(
+      clave_unica = "ec5_uuid",
+      clave_unica_branch ="ec5_branch_uuid",
+      Fecha_creación_entrada ="created_at",
+      Fecha_subida_entrada = "uploaded_at",
+      titulo_unico = "title",
       agente="2_Agente_responsable",
       balneario_nombre = "3_Balneario",
       actividad = "4_Qu_actividad_va_a_",
       analisis_agua = "5_Anlisis_de_aguas_b",
+      proceso_agua = "12_Procedimiento_par",
       fecha_muestreo = "7_Fecha",
       N_muestra = "8_Nmero_de_muestra",
       coliformes_termotolerantes = "9_Coliformes_totales",
       e_coli = "10_E_Coli",
-      imagenes = "11_ImagenDelAnalisis",
-      procesamiento= "12_Procedimiento_par",
-      num_analisis= "14_Nmero_de_anlisis",
-      altura_rio_cm= "16_Altura_del_ro_cm",
-      altura_rio="17_Altura_del_ro",
-      lat = "latitude",
-      lon = "longitude"
+      imagenes = "11_ImagenDelAnalisis"
       
-      
+      # num_analisis= "14_Nmero_de_anlisis",
+      # altura_rio_cm= "16_Altura_del_ro_cm",
+      # altura_rio="17_Altura_del_ro",
+      # lat = "latitude",
+      # lon = "longitude"
       # balneario_id = "1_Balneario_ID",
       # municipio = "3_Municipio",
       # hora_muestreo = "6_Hora",
@@ -536,18 +520,13 @@ mapear_campos_epicollect5 <- function(df_raw, mapeo_campos = NULL, Verbose = TRU
   
   # Crear data frame mapeado
   df_mapeado <- df_raw
-  message("Clase de mapeo_campos: ", class(mapeo_campos))
-  message("Longitud: ", length(mapeo_campos))
-  message("Nombres de mapeo_campos: ", paste(names(mapeo_campos), collapse = ", "))
-  Verbose <- FALSE
+  if(Verbose){
+    message("Clase de mapeo_campos: ", class(mapeo_campos))
+    message("Longitud: ", length(mapeo_campos))
+    message("Nombres de mapeo_campos: ", paste(names(mapeo_campos), collapse = ", "))
+  }
   for ( campo_interno in names(mapeo_campos)) {
     campo_epicollect <- mapeo_campos[[campo_interno]]
-
-    if(Verbose){
-      message("--- FLAG Nombres de mapeo_campos[[campo_interno]] y campo_epicollect,---")
-      cat(campo_interno, sep = "\n")
-      cat(campo_epicollect, sep = "\n")
-    }
     
     if (campo_epicollect %in% names(df_raw)) {
       df_mapeado[[campo_interno]] <- df_raw[[campo_epicollect]]
@@ -568,18 +547,18 @@ mapear_campos_epicollect5 <- function(df_raw, mapeo_campos = NULL, Verbose = TRU
     cat(str(df_mapeado), sep = "\n")
   }
   
-  # Seleccionar únicamente las columnas mapeadas válidas
-  df_mapeado <- df_mapeado %>%
-    select(any_of(names(mapeo_campos)))
-  
-  # Garantizar la existencia de columnas críticas con valores por defecto si no están
-  cols_obligatorias <- c("balneario_id", "municipio", "estado", "lat", "lon")
-  
-  for (col in cols_obligatorias) {
-    if (!col %in% names(df_mapeado)) {
-      df_mapeado[[col]] <- NA
-    }
-  }
+  # # Seleccionar únicamente las columnas mapeadas válidas
+  # df_mapeado <- df_mapeado %>%
+  #   select(any_of(names(mapeo_campos)))
+  # 
+  # # Garantizar la existencia de columnas críticas con valores por defecto si no están
+  # cols_obligatorias <- c("balneario_id", "municipio", "estado", "lat", "lon")
+  # 
+  # for (col in cols_obligatorias) {
+  #   if (!col %in% names(df_mapeado)) {
+  #     df_mapeado[[col]] <- NA
+  #   }
+  # }
   
   return(df_mapeado)
 }

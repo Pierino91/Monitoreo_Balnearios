@@ -188,6 +188,8 @@ evaluar_todos_balnearios <- function(df, fecha_referencia = Sys.Date()) {
   
   balnearios_unicos <- unique(df$balneario_id)
   
+  
+  
   resultados <- lapply(balnearios_unicos, function(id) {
     
     df_balneario <- df %>% filter(balneario_id == id)
@@ -196,7 +198,7 @@ evaluar_todos_balnearios <- function(df, fecha_referencia = Sys.Date()) {
     info_basica <- df_balneario %>%
       arrange(desc(fecha_muestreo)) %>%
       slice(1) %>%
-      select(balneario_id, balneario_nombre, municipio, lat, lon)
+      select(balneario_id, balneario_nombre, lat, lon)
     
     # Evaluación normativa
     evaluacion <- evaluar_balneario_completo(df_balneario, fecha_referencia)
@@ -215,7 +217,6 @@ evaluar_todos_balnearios <- function(df, fecha_referencia = Sys.Date()) {
     tibble(
       balneario_id = info_basica$balneario_id,
       balneario_nombre = info_basica$balneario_nombre,
-      municipio = info_basica$municipio,
       lat = info_basica$lat,
       lon = info_basica$lon,
       

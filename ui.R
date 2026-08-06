@@ -20,19 +20,6 @@ ui <- dashboardPage(
       
       hr(),
       
-      radioButtons(
-        "modo_vista",
-        "Modo de Visualización:",
-        choices = c(
-          "Institucional (técnico)" = "institucional",
-          "Público (simplificado)" = "publico"
-        ),
-        selected = "institucional"
-      ),
-      
-      hr(),
-      
-      selectInput("filtro_municipio", "Municipio:", choices = NULL, multiple = TRUE),
       selectInput("filtro_balneario", "Balneario:", choices = NULL),
       dateRangeInput(
         "rango_fechas",

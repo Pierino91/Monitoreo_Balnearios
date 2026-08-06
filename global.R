@@ -17,6 +17,7 @@ library(DT)
 # ---- DATA ----
 library(dplyr)
 library(lubridate)
+library(sf)
 
 # ---- CONFIGURACIÓN GLOBAL ----
 MODO <- "produccion"   # "produccion" | "desarrollo"
@@ -30,7 +31,70 @@ VERBOSE <- TRUE
 APPS <- FALSE
 INTERVALO_ACTUALIZACION <- 3600  # segundos
 # ---- MÓDULOS ----
+
 source("R/api_epicollect5.R")
 source("R/normativa.R")
 source("R/semaforo.R")
 # source("R/epicollect5Function.R")
+
+# ---- Complemento ----
+
+mapa_balnearios <- sf::st_read("www/balnearios.geojson", quiet = TRUE)%>%
+  dplyr::mutate(
+    lon = sf::st_coordinates(geometry)[, 1],
+    lat = sf::st_coordinates(geometry)[, 2]
+  )%>%
+  dplyr::rename(
+    balneario_id="id_lugar"
+  )
+
+# ---- Funciones auxiliares ----
+
+union_tipeo_mapa_datos <- function(df_raw, verbose = FALSE) {
+  
+  #### Union con mapa ####
+
+  
+  df <- df_raw %>%
+    left_join(mapa_balnearios %>%
+                sf::st_drop_geometry(),
+              by = c("balneario_nombre" = "balneario")
+    ) %>%
+    select(-any_of(c("fid")))
+  
+  
+
+  
+  df <- df %>%
+    mutate(
+      # Fechas
+      fecha_muestreo = as.Date(fecha_muestreo),
+      
+      # Numéricos
+      e_coli = as.numeric(e_coli),
+      coliformes_termotolerantes = as.numeric(coliformes_termotolerantes),
+      # temperatura_agua = as.numeric(temperatura_agua),
+      # ph = as.numeric(ph),
+      lat = as.numeric(lat),
+      lon = as.numeric(lon),
+      # altura_rio = as.numeric(altura_rio),
+      
+      # Caracteres
+      balneario_nombre = as.character(balneario_nombre),
+      
+      # Temporada (calculada)
+      temporada = case_when(
+        month(fecha_muestreo) %in% c(12, 1, 2, 3) ~ "Verano",
+        TRUE ~ "Resto del año"
+      )
+    )
+  
+  if(verbose){
+    
+    message("🔄 union_tipeo_mapa_datos nombre de mapa")
+    cat(sort(colnames(df)))
+    
+  }
+  return(df)
+}
+

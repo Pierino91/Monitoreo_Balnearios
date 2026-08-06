@@ -1,0 +1,11 @@
+{
+"type": "FeatureCollection",
+"name": "balnearioss",
+"crs": { "type": "name", "properties": { "name": "urn:ogc:def:crs:OGC:1.3:CRS84" } },
+"xy_coordinate_resolution": 1e-07,
+"features": [
+{ "type": "Feature", "properties": { "fid": 1, "balneario": "Thompson", "id_lugar": 1 }, "geometry": { "type": "Point", "coordinates": [ -60.5097978, -31.7132934 ] } },
+{ "type": "Feature", "properties": { "fid": 2, "balneario": "Municipal", "id_lugar": 2 }, "geometry": { "type": "Point", "coordinates": [ -60.5337731, -31.7165955 ] } },
+{ "type": "Feature", "properties": { "fid": 3, "balneario": "Bajada Grande", "id_lugar": 3 }, "geometry": { "type": "Point", "coordinates": [ -60.5739693, -31.7097422 ] } }
+]
+}

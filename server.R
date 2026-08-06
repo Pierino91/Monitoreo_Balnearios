@@ -79,7 +79,7 @@ server <- function(input, output, session) {
       if (MODO == "produccion") {
         datos <- cargar_datos_epicollect5(
           client_entries = EPICOLLECT_ENTRIES,
-          client_branch = list(EPICOLLECT_BRANCH_ANALISIS, EPICOLLECT_BRANCH_PROCEDIMIENTO)
+          client_branch = EPICOLLECT_BRANCH_ANALISIS
         )
       } else {
         datos <- simular_datos_desarrollo(n_balnearios = 8, n_muestras_por_balneario = 40)
@@ -104,7 +104,7 @@ server <- function(input, output, session) {
       # Solo en producción
       datos <- cargar_datos_epicollect5(
         client_entries = EPICOLLECT_ENTRIES,
-        client_branch = list(EPICOLLECT_BRANCH_ANALISIS, EPICOLLECT_BRANCH_PROCEDIMIENTO)
+        client_branch = EPICOLLECT_BRANCH_ANALISIS
       )
       
       datos_base(datos)
@@ -118,9 +118,6 @@ server <- function(input, output, session) {
   # Actualizar selectores
   observe({
     req(datos_base())
-    
-    municipios <- sort(unique(datos_base()$municipio))
-    updateSelectInput(session, "filtro_municipio", choices = c("Todos" = "all", municipios))
     
     balnearios <- sort(unique(datos_base()$balneario_nombre))
     updateSelectInput(session, "filtro_balneario", choices = c("Todos" = "all", balnearios))
@@ -140,10 +137,6 @@ server <- function(input, output, session) {
         fecha_muestreo <= input$rango_fechas[2]
       )
     
-    # Filtro de municipio
-    if (!is.null(input$filtro_municipio) && !"all" %in% input$filtro_municipio) {
-      df <- df %>% filter(municipio %in% input$filtro_municipio)
-    }
     
     # Filtro de balneario
     if (!is.null(input$filtro_balneario) && input$filtro_balneario != "all") {
@@ -157,10 +150,10 @@ server <- function(input, output, session) {
     
     req(clasificacion_actual(), datos_filtrados())
     
-    # balnearios_filtrados <- unique(datos_filtrados()$balneario_id)
+    balnearios_filtrados <- unique(datos_filtrados()$balneario_id)
     # 
-    # clasificacion_actual() %>%
-    #   filter(balneario_id %in% balnearios_filtrados)
+    clasificacion_actual() %>%
+      filter(balneario_id %in% balnearios_filtrados)
     
   })
   
@@ -271,9 +264,8 @@ server <- function(input, output, session) {
         weight = 2,
         popup = ~paste0(
           "<b>", balneario_nombre, "</b><br>",
-          "Estado: ", icono, " ", texto_corto, "<br>",
-          "Municipio: ", municipio
-        )
+          "Estado: ", icono, " ", texto_corto, "<br>"
+      )
       ) %>%
       setView(lng = -58.2, lat = -31.8, zoom = 8)
   })
@@ -287,7 +279,6 @@ server <- function(input, output, session) {
       filter(estado %in% c("ROJO", "AMARILLO")) %>%
       select(
         Balneario = balneario_nombre,
-        Municipio = municipio,
         Estado = icono,
         `E. coli MG` = ecoli_mg_30d,
         `Colif. MG` = colif_mg_30d,
@@ -350,7 +341,6 @@ server <- function(input, output, session) {
         weight = 2,
         popup = ~paste0(
           "<h4>", icono, " ", balneario_nombre, "</h4>",
-          "<b>Municipio:</b> ", municipio, "<br>",
           "<b>Estado:</b> ", texto_corto, "<br>",
           "<hr>",
           "<b>Última muestra:</b> ", format(fecha_ultima_muestra, "%d/%m/%Y"), "<br>",
@@ -552,7 +542,6 @@ server <- function(input, output, session) {
       df_tabla <- datos_filtrados() %>%
         select(
           Balneario = balneario_nombre,
-          Municipio = municipio,
           Fecha = fecha_muestreo,
           `E. coli` = e_coli,
           `Coliformes Termotel.` = coliformes_termotolerantes,
@@ -565,7 +554,6 @@ server <- function(input, output, session) {
       df_tabla <- datos_filtrados() %>%
         select(
           Balneario = balneario_nombre,
-          Municipio = municipio,
           Fecha = fecha_muestreo,
           Hora = hora_muestreo,
           `E. coli` = e_coli,

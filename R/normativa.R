@@ -220,8 +220,13 @@ evaluar_balneario_completo <- function(df_balneario, fecha_referencia = Sys.Date
 #' @param df Data frame con datos crudos
 #' @return Data frame con flags de validación
 #' 
-validar_datos_entrada <- function(df) {
+validar_datos_entrada <- function(df, verbose = FALSE) {
   
+  if(verbose){
+    message("validar_datos_entrada:")
+    cat(str(df))
+  }
+    
   df %>%
     mutate(
       # Validaciones de integridad
