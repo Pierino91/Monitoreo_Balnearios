@@ -3,7 +3,7 @@ ui <- dashboardPage(
   skin = "blue",
   
   dashboardHeader(
-    title = "Calidad de Agua - Entre Ríos",
+    title = "Calidad de Agua - Paraná,  Entre Ríos",
     titleWidth = 300
   ),
   
@@ -55,7 +55,9 @@ ui <- dashboardPage(
           box(plotlyOutput("grafico_resumen_estados", height = 300), width = 6),
           box(leafletOutput("mapa_resumen", height = 300), width = 6)
         ),
-        box(DTOutput("tabla_criticos"), width = 12)
+        box(title = "Balnearios en estado crítico", 
+            width = 12,
+            DTOutput("tabla_criticos"))
       ),
       
       tabItem(
@@ -80,7 +82,16 @@ ui <- dashboardPage(
       
       tabItem(
         tabName = "normativa",
-        uiOutput("contenido_normativa")
+        box(
+          title = "Normativa Vigente de Calidad de Agua",
+          status = "primary",
+          solidHeader = TRUE,
+          width = 12,
+          tags$iframe(
+            style = "width:100%; height:800px; border:none;",
+            src = "Resolución084.pdf" # Nombre del archivo dentro de la carpeta www/
+          )
+        )
       )
     )
   )

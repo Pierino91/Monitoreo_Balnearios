@@ -10,6 +10,8 @@ server <- function(input, output, session) {
   # Cargar datos al inicio
   observeEvent(TRUE, {
     
+    message("🚀 Inicio de carga de datos")
+    
     withProgress(message = 'Cargando datos...', value = 0, {
       
       incProgress(0.3, detail = "Conectando con Epicollect5...")
@@ -18,15 +20,25 @@ server <- function(input, output, session) {
       
       if (MODO == "produccion") {
         
+        message("📡 Modo producción")
+        message("📡 Proyecto: ", EPICOLLECT_PROJECT)
+        
         datos <- tryCatch({
           
-          cargar_datos_epicollect5(
+          resultado <- cargar_datos_epicollect5(
             project_slug = EPICOLLECT_PROJECT,
             client_entries = EPICOLLECT_ENTRIES,
             client_branch = EPICOLLECT_BRANCH_ANALISIS
           )
           
+          message("✅ cargar_datos_epicollect5 finalizó")
+          message("📊 Registros recibidos: ", nrow(resultado))
+          
+          resultado
+          
         }, error = function(e) {
+          
+          message("❌ ERROR: ", e$message)
           
           showNotification(
             paste("Error al cargar datos:", e$message),
@@ -39,35 +51,48 @@ server <- function(input, output, session) {
         
       } else {
         
+        message("🧪 Modo desarrollo")
+        
         datos <- simular_datos_desarrollo(
           n_balnearios = 8,
           n_muestras_por_balneario = 40
         )
         
+        message("📊 Registros simulados: ", nrow(datos))
       }
       
+      message("🔍 is.null(datos) = ", is.null(datos))
+      
       if (is.null(datos)) {
+        message("⛔ Se aborta porque datos es NULL")
         return()
       }
+      
+      message("📋 Columnas:")
+      print(names(datos))
+      
+      message("📋 Primeras filas:")
+      print(head(datos))
       
       datos_base(datos)
       
       incProgress(0.9, detail = "Evaluando balnearios...")
       
+      message("🏖️ Ejecutando evaluar_todos_balnearios()")
+      
       clasificacion <- evaluar_todos_balnearios(datos)
+      
+      message("✅ Balnearios evaluados: ", nrow(clasificacion))
+      
       clasificacion_actual(clasificacion)
       
       ultima_actualizacion(Sys.time())
       
       incProgress(1, detail = "Completado")
+      
+      message("🎉 Proceso completado")
     })
-    
-    showNotification(
-      "Datos cargados exitosamente",
-      type = "message",
-      duration = 3
-    )
-  }, once = TRUE)
+  })
   
   # Actualización manual
   observeEvent(input$btn_actualizar, {
@@ -534,38 +559,35 @@ server <- function(input, output, session) {
   output$tabla_completa <- renderDT({
     req(datos_filtrados())
     
-    modo <- input$modo_vista
-    
-    if (modo == "publico") {
-      # Vista simplificada para público
 
-      df_tabla <- datos_filtrados() %>%
-        select(
-          Balneario = balneario_nombre,
-          Fecha = fecha_muestreo,
-          `E. coli` = e_coli,
-          `Coliformes Termotel.` = coliformes_termotolerantes,
-          `Temp. °C` = temperatura_agua,
-          pH = ph,
-          `Altura río (cm)` = altura_rio
-        )
-    } else {
+      # df_tabla <- datos_filtrados() %>%
+      #   select(
+      #     Balneario = balneario_nombre,
+      #     Fecha = fecha_muestreo,
+      #     `E. coli` = e_coli,
+      #     `Coliformes Termotel.` = coliformes_termotolerantes,
+      #     `Temp. °C` = temperatura_agua,
+      #     pH = ph,
+      #     `Altura río (cm)` = altura_rio
+      #   )
       # Vista técnica completa
+    
       df_tabla <- datos_filtrados() %>%
         select(
           Balneario = balneario_nombre,
           Fecha = fecha_muestreo,
-          Hora = hora_muestreo,
           `E. coli` = e_coli,
           `Coliformes Termotel.` = coliformes_termotolerantes,
-          `Temp. °C` = temperatura_agua,
-          pH = ph,
-          `Lluvias 72h` = lluvias_previas,
-          `Altura río (cm)` = altura_rio,
+          # `Temp. °C` = temperatura_agua,
+          # pH = ph,
+          # `Lluvias 72h` = lluvias_previas,
+          # `Altura río (cm)` = altura_rio,
           Temporada = temporada,
-          Válido = registro_valido
+          Valido = registro_valido
+        )%>%
+        mutate(
+          Valido = if_else(Valido, "Verdadero", "Falso")
         )
-    }
     
     datatable(
       df_tabla,
@@ -577,7 +599,12 @@ server <- function(input, output, session) {
       rownames = FALSE,
       filter = 'top'
     ) %>%
-      formatRound(columns = c("E. coli", "Coliformes Termotel.", "Temp. °C", "pH", "Altura río (cm)"), 
+      formatRound(columns = c("E. coli", 
+                              "Coliformes Termotel." 
+                              # "Temp. °C", 
+                              # "pH", 
+                              # "Altura río (cm)"
+                              ), 
                   digits = 1)
   })
   
@@ -602,6 +629,19 @@ server <- function(input, output, session) {
     }
   )
   
+  # ---- CONTENIDO NORMATIVAS ----
   
+  output$contenido_normativa <- renderUI({
+    box(
+      title = "Normativa Vigente",
+      status = "primary",
+      solidHeader = TRUE,
+      width = 12,
+      tags$iframe(
+        style = "width:100%; height:800px; border:none;",
+        src = "Resolución084.pdf"
+      )
+    )
+  })
   
 }

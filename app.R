@@ -16,4 +16,4 @@ source("ui.R")
 source("server.R")
 
 # ---- RUN ----
-# shinyApp(ui = ui, server = server)
+# rsconnect::deployApp(appName="Monitoreo_Balnearios")

@@ -52,31 +52,16 @@ mapa_balnearios <- sf::st_read("www/balnearios.geojson", quiet = TRUE)%>%
 
 union_tipeo_mapa_datos <- function(df_raw, verbose = FALSE) {
   
-  #### Union con mapa ####
-
-  
-  df <- df_raw %>%
-    left_join(mapa_balnearios %>%
-                sf::st_drop_geometry(),
-              by = c("balneario_nombre" = "balneario")
-    ) %>%
-    select(-any_of(c("fid")))
-  
-  
-
-  
-  df <- df %>%
+  df_raw <- df_raw %>%
     mutate(
       # Fechas
-      fecha_muestreo = as.Date(fecha_muestreo),
+      fecha_muestreo = as.Date(fecha_muestreo, format = "%d/%m/%Y"),
       
       # Numéricos
       e_coli = as.numeric(e_coli),
       coliformes_termotolerantes = as.numeric(coliformes_termotolerantes),
       # temperatura_agua = as.numeric(temperatura_agua),
       # ph = as.numeric(ph),
-      lat = as.numeric(lat),
-      lon = as.numeric(lon),
       # altura_rio = as.numeric(altura_rio),
       
       # Caracteres
@@ -89,12 +74,27 @@ union_tipeo_mapa_datos <- function(df_raw, verbose = FALSE) {
       )
     )
   
+  #### Union con mapa ####
+  
+  df <- df_raw %>%
+    left_join(mapa_balnearios %>%
+                sf::st_drop_geometry(),
+              by = c("balneario_nombre" = "balneario")
+    ) %>%
+    select(-any_of(c("fid")))%>%
+    mutate(
+      lat = as.numeric(lat),
+      lon = as.numeric(lon)
+    )
+  
+
   if(verbose){
     
     message("🔄 union_tipeo_mapa_datos nombre de mapa")
     cat(sort(colnames(df)))
     
   }
+  
   return(df)
 }
 

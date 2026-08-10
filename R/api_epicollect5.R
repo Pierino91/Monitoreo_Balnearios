@@ -24,6 +24,7 @@ obtener_datos <- function(url) {
   }
 }
 
+# TODO por el momento no se v a avalidar, lo vamos a dejar apra despues
 
 #' @param project_slug Nombre del proyecto
 #' @param mapeo_campos Mapeo personalizado (opcional)
@@ -31,14 +32,15 @@ obtener_datos <- function(url) {
 #' @param client_secret Client Secret OAuth2 (opcional)
 #' @return Data frame limpio listo para análisis
 #' 
-cargar_datos_epicollect5 <- function(client_entries,
+cargar_datos_epicollect5 <- function(project_slug,
+                                     client_entries,
                                      client_branch,
                                      verbose = FALSE) {
   # Obtener datos crudos
   if(!is.null(client_branch)){
     df_raw <- obtener_datos_epicollect5(
       client_entries = client_entries,
-      client_branch = list(client_branch)
+      client_branch = client_branch
     )
   }else{
     df_raw <- obtener_datos_epicollect5(
@@ -68,13 +70,21 @@ cargar_datos_epicollect5 <- function(client_entries,
     message("REPORTE DE CALIDAD")
     cat(colnames(df_validado))
   }
+  
   n_invalidos <- sum(!df_validado$registro_valido)
   if (n_invalidos > 0) {
-    warning(sprintf(
-      "⚠ %d registros inválidos encontrados (%.1f%%)",
-      n_invalidos,
-      n_invalidos / nrow(df_validado) * 100
-    ))
+    
+    df_invalidado <- df_validado %>%
+      filter(!registro_valido)
+    
+    warning(
+      sprintf(
+        "⚠ %d registros inválidos encontrados (%.1f%%). Balnearios: %s",
+        n_invalidos,
+        100 * n_invalidos / nrow(df_validado),
+        paste(str(df_invalidado), collapse = ", ")
+      )
+    )
   }
   
   return(df_validado)
@@ -480,10 +490,13 @@ procesar_datos_epicollect5 <- function(df_raw, mapeo_campos = NULL, verbose = FA
 #' @return Data frame normalizado
 #' 
 
-mapear_campos_epicollect5 <- function(df_raw, mapeo_campos = NULL, Verbose = FALSE) {
+mapear_campos_epicollect5 <- function(df_raw, mapeo_campos = NULL, Verbose = TRUE) {
   
   # Mapeo default (ajustar según estructura real del proyecto)
- 
+  if(Verbose){
+    message("Nombres de mapear_campos_epicollect5 de df_raw: ", paste(names(df_raw), collapse = ", "))
+  }
+  
   if (is.null(mapeo_campos)) {
     mapeo_campos <- list(
       clave_unica = "ec5_uuid",
@@ -501,20 +514,7 @@ mapear_campos_epicollect5 <- function(df_raw, mapeo_campos = NULL, Verbose = FAL
       coliformes_termotolerantes = "9_Coliformes_totales",
       e_coli = "10_E_Coli",
       imagenes = "11_ImagenDelAnalisis"
-      
-      # num_analisis= "14_Nmero_de_anlisis",
-      # altura_rio_cm= "16_Altura_del_ro_cm",
-      # altura_rio="17_Altura_del_ro",
-      # lat = "latitude",
-      # lon = "longitude"
-      # balneario_id = "1_Balneario_ID",
-      # municipio = "3_Municipio",
-      # hora_muestreo = "6_Hora",
-      # temperatura_agua = "9_Temperatura_Agua_C",
-      # ph = "10_pH",
-      # lluvias_previas = "11_Lluvias_72h_Previas",
-      # altura_rio = "12_Altura_Rio_cm"
-      
+    
     )
   }
   
@@ -546,20 +546,7 @@ mapear_campos_epicollect5 <- function(df_raw, mapeo_campos = NULL, Verbose = FAL
     cat(class(df_mapeado), sep = "\n")
     cat(str(df_mapeado), sep = "\n")
   }
-  
-  # # Seleccionar únicamente las columnas mapeadas válidas
-  # df_mapeado <- df_mapeado %>%
-  #   select(any_of(names(mapeo_campos)))
-  # 
-  # # Garantizar la existencia de columnas críticas con valores por defecto si no están
-  # cols_obligatorias <- c("balneario_id", "municipio", "estado", "lat", "lon")
-  # 
-  # for (col in cols_obligatorias) {
-  #   if (!col %in% names(df_mapeado)) {
-  #     df_mapeado[[col]] <- NA
-  #   }
-  # }
-  
+
   return(df_mapeado)
 }
 

@@ -178,42 +178,111 @@ generar_resumen_clasificacion <- function(df_evaluaciones) {
 }
 
 
-#' Evaluar múltiples balnearios
-#' 
-#' @param df Data frame completo con datos de todos los balnearios
-#' @param fecha_referencia Fecha de evaluación
-#' @return Data frame con evaluación y clasificación por balneario
-#' 
-evaluar_todos_balnearios <- function(df, fecha_referencia = Sys.Date()) {
+evaluar_todos_balnearios <- function(df,
+                                     fecha_referencia = Sys.Date(),
+                                     debug = FALSE) {
+  
+  if(debug){
+    message("\n==================================================")
+    message("INICIO evaluar_todos_balnearios")
+    message("==================================================")
+    message("Filas recibidas: ", nrow(df))
+    message("Columnas recibidas: ", ncol(df))
+    message("Balnearios únicos: ", length(unique(df$balneario_id)))
+    
+    print(unique(df$balneario_nombre))
+  }
   
   balnearios_unicos <- unique(df$balneario_id)
   
-  
-  
   resultados <- lapply(balnearios_unicos, function(id) {
     
-    df_balneario <- df %>% filter(balneario_id == id)
+    if(debug){
+      message("\n--------------------------------------------------")
+      message("BALNEARIO ID: ", id)
+      message("--------------------------------------------------")
+    }
     
-    # Información básica
+    df_balneario <- df %>%
+      filter(balneario_id == id)
+    
+    if(debug){
+      message("Registros encontrados: ", nrow(df_balneario))
+      
+      if(nrow(df_balneario) == 0){
+        warning("⚠ Sin registros para ID = ", id)
+      }
+    }
+    
     info_basica <- df_balneario %>%
       arrange(desc(fecha_muestreo)) %>%
       slice(1) %>%
       select(balneario_id, balneario_nombre, lat, lon)
     
-    # Evaluación normativa
-    evaluacion <- evaluar_balneario_completo(df_balneario, fecha_referencia)
+    if(debug){
+      
+      message("Balneario: ",
+              info_basica$balneario_nombre)
+      
+      message("Lat: ", info_basica$lat)
+      message("Lon: ", info_basica$lon)
+      
+      message("Fecha mínima: ",
+              min(df_balneario$fecha_muestreo,
+                  na.rm = TRUE))
+      
+      message("Fecha máxima: ",
+              max(df_balneario$fecha_muestreo,
+                  na.rm = TRUE))
+    }
     
-    # Clasificación
-    clasificacion <- clasificar_estado_sanitario(evaluacion)
+    evaluacion <- evaluar_balneario_completo(
+      df_balneario,
+      fecha_referencia
+    )
     
-    # Última muestra
+    if(debug){
+      
+      message("Evaluación generada")
+      
+      print(evaluacion$resumen)
+    }
+    
+    clasificacion <- clasificar_estado_sanitario(
+      evaluacion
+    )
+    
+    if(debug){
+      
+      message("Estado sanitario: ",
+              clasificacion$estado)
+      
+      message("Habilitado: ",
+              clasificacion$habilitado)
+    }
+    
     ultima_muestra <- df_balneario %>%
       filter(!is.na(fecha_muestreo)) %>%
       arrange(desc(fecha_muestreo)) %>%
       slice(1) %>%
-      select(fecha_muestreo, e_coli, coliformes_termotolerantes)
+      select(
+        fecha_muestreo,
+        e_coli,
+        coliformes_termotolerantes
+      )
     
-    # Compilar resultado
+    if(debug){
+      
+      message("Última muestra: ",
+              ultima_muestra$fecha_muestreo)
+      
+      message("E.Coli última: ",
+              ultima_muestra$e_coli)
+      
+      message("Coliformes última: ",
+              ultima_muestra$coliformes_termotolerantes)
+    }
+    
     tibble(
       balneario_id = info_basica$balneario_id,
       balneario_nombre = info_basica$balneario_nombre,
@@ -239,9 +308,34 @@ evaluar_todos_balnearios <- function(df, fecha_referencia = Sys.Date()) {
       ecoli_excedencias = evaluacion$resumen$ecoli_excedencias,
       colif_excedencias = evaluacion$resumen$colif_excedencias
     )
+    
   })
   
-  bind_rows(resultados)
+  resultado_final <- bind_rows(resultados)
+  
+  if(debug){
+    
+    message("\n==================================================")
+    message("RESUMEN FINAL")
+    message("==================================================")
+    
+    message("Filas generadas: ",
+            nrow(resultado_final))
+    
+    message("Balnearios clasificados: ",
+            length(unique(resultado_final$balneario_id)))
+    
+    print(
+      resultado_final %>%
+        select(
+          balneario_nombre,
+          estado,
+          habilitado
+        )
+    )
+  }
+  
+  resultado_final
 }
 
 

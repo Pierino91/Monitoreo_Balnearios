@@ -55,27 +55,27 @@ media_geometrica_30dias <- function(df, fecha_referencia, parametro = "e_coli") 
   
   n_muestras <- nrow(datos_ventana)
   
-  if (n_muestras < 5) {
-    return(list(
-      media_geometrica = NA_real_,
-      n_muestras = n_muestras,
-      suficientes_datos = FALSE,
-      fecha_inicio = fecha_inicio,
-      fecha_fin = fecha_ref
-    ))
-  }
-  
-  mg <- calcular_media_geometrica(datos_ventana[[parametro]])
-  
+  # if (n_muestras < 5) {
   return(list(
-    media_geometrica = mg,
+    media_geometrica = NA_real_,
     n_muestras = n_muestras,
-    suficientes_datos = TRUE,
+    suficientes_datos = FALSE,
     fecha_inicio = fecha_inicio,
-    fecha_fin = fecha_ref,
-    valores_min = min(datos_ventana[[parametro]], na.rm = TRUE),
-    valores_max = max(datos_ventana[[parametro]], na.rm = TRUE)
+    fecha_fin = fecha_ref
   ))
+  # }
+  # 
+  # mg <- calcular_media_geometrica(datos_ventana[[parametro]])
+  # 
+  # return(list(
+  #   media_geometrica = mg,
+  #   n_muestras = n_muestras,
+  #   suficientes_datos = TRUE,
+  #   fecha_inicio = fecha_inicio,
+  #   fecha_fin = fecha_ref,
+  #   valores_min = min(datos_ventana[[parametro]], na.rm = TRUE),
+  #   valores_max = max(datos_ventana[[parametro]], na.rm = TRUE)
+  # ))
 }
 
 
@@ -157,10 +157,49 @@ validar_coliformes_art8 <- function(media_geo, valores_individuales) {
 #' @param fecha_referencia Fecha de evaluación (default: hoy)
 #' @return Data frame con resultados completos
 #' 
-evaluar_balneario_completo <- function(df_balneario, fecha_referencia = Sys.Date()) {
+evaluar_balneario_completo <- function(
+    df_balneario,
+    fecha_referencia = Sys.Date(),
+    debug = TRUE
+) {
   
-  # E. coli
-  mg_ecoli <- media_geometrica_30dias(df_balneario, fecha_referencia, "e_coli")
+  if(debug){
+    
+    message("")
+    message("========================================")
+    message("evaluar_balneario_completo")
+    message("========================================")
+    
+    message("Balneario: ",
+            unique(df_balneario$balneario_nombre)[1])
+    
+    message("ID: ",
+            unique(df_balneario$balneario_id)[1])
+    
+    message("Filas recibidas: ",
+            nrow(df_balneario))
+    
+    message("Fecha referencia: ",
+            as.character(fecha_referencia))
+    
+    message("Fecha mínima datos: ",
+            min(df_balneario$fecha_muestreo,
+                na.rm = TRUE))
+    
+    message("Fecha máxima datos: ",
+            max(df_balneario$fecha_muestreo,
+                na.rm = TRUE))
+  }
+  
+  # -------------------------
+  # E. COLI
+  # -------------------------
+  
+  mg_ecoli <- media_geometrica_30dias(
+    df_balneario,
+    fecha_referencia,
+    "e_coli"
+  )
   
   valores_ecoli <- df_balneario %>%
     filter(
@@ -170,10 +209,58 @@ evaluar_balneario_completo <- function(df_balneario, fecha_referencia = Sys.Date
     ) %>%
     pull(e_coli)
   
-  validacion_ecoli <- validar_ecoli_art8(mg_ecoli$media_geometrica, valores_ecoli)
+  if(debug){
+    
+    message("")
+    message("---- E.COLI ----")
+    
+    message("Muestras ventana 30 días: ",
+            length(valores_ecoli))
+    
+    if(length(valores_ecoli) > 0){
+      
+      message("Min: ", min(valores_ecoli))
+      message("Max: ", max(valores_ecoli))
+      
+      message("Valores:")
+      print(valores_ecoli)
+    } else {
+      warning("⚠ Sin muestras E.Coli en ventana de 30 días")
+    }
+    
+    message("Media geométrica: ",
+            mg_ecoli$media_geometrica)
+    
+    message("N muestras: ",
+            mg_ecoli$n_muestras)
+    
+    message("Datos suficientes: ",
+            mg_ecoli$suficientes_datos)
+  }
   
-  # Coliformes termotolerantes
-  mg_colif <- media_geometrica_30dias(df_balneario, fecha_referencia, "coliformes_termotolerantes")
+  validacion_ecoli <- validar_ecoli_art8(
+    mg_ecoli$media_geometrica,
+    valores_ecoli
+  )
+  
+  if(debug){
+    
+    message("Cumple E.Coli: ",
+            validacion_ecoli$cumplimiento)
+    
+    message("Excedencias críticas: ",
+            validacion_ecoli$excedencias_criticas)
+  }
+  
+  # -------------------------
+  # COLIFORMES
+  # -------------------------
+  
+  mg_colif <- media_geometrica_30dias(
+    df_balneario,
+    fecha_referencia,
+    "coliformes_termotolerantes"
+  )
   
   valores_colif <- df_balneario %>%
     filter(
@@ -183,35 +270,88 @@ evaluar_balneario_completo <- function(df_balneario, fecha_referencia = Sys.Date
     ) %>%
     pull(coliformes_termotolerantes)
   
-  validacion_colif <- validar_coliformes_art8(mg_colif$media_geometrica, valores_colif)
+  if(debug){
+    
+    message("")
+    message("---- COLIFORMES ----")
+    
+    message("Muestras ventana 30 días: ",
+            length(valores_colif))
+    
+    if(length(valores_colif) > 0){
+      
+      message("Min: ", min(valores_colif))
+      message("Max: ", max(valores_colif))
+      
+      message("Valores:")
+      print(valores_colif)
+    } else {
+      warning("⚠ Sin muestras de coliformes en ventana de 30 días")
+    }
+    
+    message("Media geométrica: ",
+            mg_colif$media_geometrica)
+    
+    message("N muestras: ",
+            mg_colif$n_muestras)
+    
+    message("Datos suficientes: ",
+            mg_colif$suficientes_datos)
+  }
   
-  # Compilar resultado
+  validacion_colif <- validar_coliformes_art8(
+    mg_colif$media_geometrica,
+    valores_colif
+  )
+  
+  if(debug){
+    
+    message("Cumple Coliformes: ",
+            validacion_colif$cumplimiento)
+    
+    message("Excedencias críticas: ",
+            validacion_colif$excedencias_criticas)
+  }
+  
   resultado <- tibble(
     fecha_evaluacion = as.Date(fecha_referencia),
     
-    # E. coli
     ecoli_mg = mg_ecoli$media_geometrica,
     ecoli_n_muestras = mg_ecoli$n_muestras,
     ecoli_cumple = validacion_ecoli$cumplimiento,
     ecoli_excedencias = validacion_ecoli$excedencias_criticas,
     
-    # Coliformes
     colif_mg = mg_colif$media_geometrica,
     colif_n_muestras = mg_colif$n_muestras,
     colif_cumple = validacion_colif$cumplimiento,
     colif_excedencias = validacion_colif$excedencias_criticas,
     
-    # Datos suficientes
-    datos_suficientes = mg_ecoli$suficientes_datos && mg_colif$suficientes_datos
+    datos_suficientes =
+      mg_ecoli$suficientes_datos &&
+      mg_colif$suficientes_datos
   )
   
-  return(list(
-    resumen = resultado,
-    detalle_ecoli = validacion_ecoli,
-    detalle_colif = validacion_colif,
-    ventana_ecoli = mg_ecoli,
-    ventana_colif = mg_colif
-  ))
+  if(debug){
+    
+    message("")
+    message("---- RESUMEN FINAL ----")
+    
+    print(resultado)
+    
+    if(!resultado$datos_suficientes){
+      warning("⚠ Datos insuficientes para clasificación")
+    }
+  }
+  
+  return(
+    list(
+      resumen = resultado,
+      detalle_ecoli = validacion_ecoli,
+      detalle_colif = validacion_colif,
+      ventana_ecoli = mg_ecoli,
+      ventana_colif = mg_colif
+    )
+  )
 }
 
 
@@ -222,12 +362,8 @@ evaluar_balneario_completo <- function(df_balneario, fecha_referencia = Sys.Date
 #' 
 validar_datos_entrada <- function(df, verbose = FALSE) {
   
-  if(verbose){
-    message("validar_datos_entrada:")
-    cat(str(df))
-  }
-    
-  df %>%
+  
+ df_raw<- df %>%
     mutate(
       # Validaciones de integridad
       flag_fecha_na = is.na(fecha_muestreo),
@@ -249,7 +385,13 @@ validar_datos_entrada <- function(df, verbose = FALSE) {
                           flag_ecoli_negativo | flag_colif_negativo |
                           flag_ecoli_extremo | flag_colif_extremo)
     )
-  
+
+  if(verbose){
+    message("validar_datos_entrada:")
+    cat(str(df_raw))
+  }
+ 
+ return(df_raw)
 }
 
 

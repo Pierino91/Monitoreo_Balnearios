@@ -1,0 +1,10 @@
+name: Monitoreo_Balnearios
+title:
+username: ambiente-parana
+account: ambiente-parana
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 17677940
+bundleId: 12379948
+url: https://ambiente-parana.shinyapps.io/Monitoreo_Balnearios/
+version: 1
