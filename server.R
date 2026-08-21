@@ -95,31 +95,31 @@ server <- function(input, output, session) {
   })
   
   # Actualización manual
-  observeEvent(input$btn_actualizar, {
-    
-    withProgress(message = 'Actualizando...', value = 0, {
-      
-      incProgress(0.5)
-      
-      if (MODO == "produccion") {
-        datos <- cargar_datos_epicollect5(
-          client_entries = EPICOLLECT_ENTRIES,
-          client_branch = EPICOLLECT_BRANCH_ANALISIS
-        )
-      } else {
-        datos <- simular_datos_desarrollo(n_balnearios = 8, n_muestras_por_balneario = 40)
-      }
-      
-      datos_base(datos)
-      clasificacion <- evaluar_todos_balnearios(datos)
-      clasificacion_actual(clasificacion)
-      ultima_actualizacion(Sys.time())
-      
-      incProgress(1)
-    })
-    
-    showNotification("Datos actualizados", type = "message")
-  })
+  # observeEvent(input$btn_actualizar, {
+  #   
+  #   withProgress(message = 'Actualizando...', value = 0, {
+  #     
+  #     incProgress(0.5)
+  #     
+  #     if (MODO == "produccion") {
+  #       datos <- cargar_datos_epicollect5(
+  #         client_entries = EPICOLLECT_ENTRIES,
+  #         client_branch = EPICOLLECT_BRANCH_ANALISIS
+  #       )
+  #     } else {
+  #       datos <- simular_datos_desarrollo(n_balnearios = 8, n_muestras_por_balneario = 40)
+  #     }
+  #     
+  #     datos_base(datos)
+  #     clasificacion <- evaluar_todos_balnearios(datos)
+  #     clasificacion_actual(clasificacion)
+  #     ultima_actualizacion(Sys.time())
+  #     
+  #     incProgress(1)
+  #   })
+  #   
+  #   showNotification("Datos actualizados", type = "message")
+  # })
   
   # Actualización automática periódica
   observe({

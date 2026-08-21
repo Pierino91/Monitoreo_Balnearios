@@ -490,7 +490,7 @@ procesar_datos_epicollect5 <- function(df_raw, mapeo_campos = NULL, verbose = FA
 #' @return Data frame normalizado
 #' 
 
-mapear_campos_epicollect5 <- function(df_raw, mapeo_campos = NULL, Verbose = TRUE) {
+mapear_campos_epicollect5 <- function(df_raw, mapeo_campos = NULL, Verbose = FALSE) {
   
   # Mapeo default (ajustar según estructura real del proyecto)
   if(Verbose){
