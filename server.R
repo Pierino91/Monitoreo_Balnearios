@@ -120,8 +120,8 @@ server <- function(input, output, session) {
   #   
   #   showNotification("Datos actualizados", type = "message")
   # })
-  
   # Actualización automática periódica
+  
   observe({
     invalidateLater(INTERVALO_ACTUALIZACION * 1000)
     
@@ -150,6 +150,26 @@ server <- function(input, output, session) {
   
   # ---- DATOS FILTRADOS ----
   
+  datos_diarios <- reactive({
+    req(datos_hidraulicos_historicos_diarios)
+    
+    datos_hidraulicos_historicos_diarios %>%
+      group_by(Fecha = as.Date(Datetime)) %>%
+      summarise(
+        Temp_Max = max(Temp_Max, na.rm = TRUE),
+        Temp_Min = min(Temp_Min, na.rm = TRUE),
+        Temp_Prom = mean(Temp_Ext, na.rm = TRUE),
+        Lluvia_Total = sum(Lluvia, na.rm = TRUE),
+        .groups = "drop"
+      )
+  })
+  
+  datos_semanales <- reactive({
+    datos_hidraulica_ultima_semana
+  })
+  
+  ### TODO incorporar el filtro en los datos meteorológicos
+  
   datos_filtrados <- reactive({
     req(datos_base())
     
@@ -176,7 +196,7 @@ server <- function(input, output, session) {
     req(clasificacion_actual(), datos_filtrados())
     
     balnearios_filtrados <- unique(datos_filtrados()$balneario_id)
-    # 
+
     clasificacion_actual() %>%
       filter(balneario_id %in% balnearios_filtrados)
     
@@ -294,6 +314,226 @@ server <- function(input, output, session) {
       ) %>%
       setView(lng = -58.2, lat = -31.8, zoom = 8)
   })
+  
+  # ---- DATOS METEOROLÓGICOS ----
+  
+  output$grafico_meteo_horario <- renderPlotly({
+    req(datos_hidraulicos)
+    
+    df_diario <- datos_diarios()
+    
+    req(nrow(df_diario) > 0)
+    
+    plot_ly(data = df_diario, x = ~Fecha) %>%
+      
+      add_trace(
+        y = ~Temp_Max, 
+        name = 'Temp. Máxima Diaria (°C)', 
+        type = 'scatter', 
+        mode = 'lines',
+        line = list(
+          color = 'rgba(239, 83, 80, 0.7)', 
+          width = 1.5, 
+          dash = 'dot'
+        )
+      ) %>%
+      
+      add_trace(
+        y = ~Temp_Prom, 
+        name = 'Temp. Promedio Diaria (°C)', 
+        type = 'scatter', 
+        mode = 'lines+markers',
+        line = list(
+          color = '#FF5722', 
+          width = 2
+        ),
+        marker = list(
+          color = '#FF5722', 
+          size = 6
+        )
+      ) %>%
+      
+      add_trace(
+        y = ~Temp_Min, 
+        name = 'Temp. Mínima Diaria (°C)', 
+        type = 'scatter', 
+        mode = 'lines',
+        line = list(
+          color = 'rgba(66, 165, 245, 0.7)', 
+          width = 1.5, 
+          dash = 'dot'
+        )
+      ) %>%
+      
+      add_trace(
+        y = ~Lluvia_Total, 
+        name = 'Lluvia Total (mm/día)', 
+        type = 'bar',
+        yaxis = 'y2',
+        marker = list(
+          color = '#2196F3', 
+          opacity = 0.5
+        )
+      ) %>%
+      
+      layout(
+        
+        title = list(
+          text = "<b>Resumen Meteorológico Diario - Estación Paraná</b>", 
+          font = list(size = 16)
+        ),
+        
+        xaxis = list(
+          title = "Fecha", 
+          type = 'date', 
+          tickformat = "%d/%m/%Y", 
+          showgrid = TRUE
+        ),
+        
+        yaxis = list(
+          title = "Temperatura (°C)", 
+          showgrid = TRUE
+        ),
+        
+        yaxis2 = list(
+          title = "Precipitación Acumulada (mm)", 
+          overlaying = "y", 
+          side = "right", 
+          showgrid = FALSE
+        ),
+        
+        hovermode = "x unified",
+        
+        legend = list(
+          orientation = 'h', 
+          x = 0.05, 
+          y = -0.2
+        ),
+        
+        # --------------------------------------------------------
+        # FUENTE
+        # --------------------------------------------------------
+        
+        annotations = list(
+          list(
+            text = 'Fuente: <a href="https://www.hidraulica.gob.ar/" target="_blank">Dirección de Hidráulica de Entre Ríos</a>',
+            x = 0,
+            y = -0.35,
+            xref = "paper",
+            yref = "paper",
+            showarrow = FALSE,
+            xanchor = "left",
+            font = list(
+              size = 10
+            )
+          )
+        )
+      )
+  })
+  
+  
+  output$grafico_meteo_diario <- renderPlotly({
+    req(datos_hidraulica_ultima_semana)
+    
+    plot_ly(
+      data = datos_hidraulica_ultima_semana,
+      x = ~Datetime
+    ) %>%
+      
+      add_trace(
+        y = ~Temp_Ext, 
+        name = 'Temp. Exterior (°C)', 
+        type = 'scatter', 
+        mode = 'lines+markers',
+        line = list(
+          color = '#FF5722', 
+          width = 2
+        ),
+        marker = list(
+          color = '#FF5722', 
+          size = 5
+        )
+      ) %>%
+      
+      add_trace(
+        y = ~Sens_Term,
+        name = 'Sensación Térmica (°C)',
+        type = 'scatter',
+        mode = 'lines',
+        line = list(
+          color = '#E64A19', 
+          width = 1.2, 
+          dash = 'dash'
+        )
+      ) %>%
+      
+      add_trace(
+        y = ~Lluvia,
+        name = 'Lluvia (mm)',
+        type = 'bar',
+        yaxis = 'y2',
+        marker = list(
+          color = '#2196F3', 
+          opacity = 0.5
+        )
+      ) %>%
+      
+      layout(
+        
+        title = list(
+          text = "<b>Monitoreo Meteorológico - Estación Paraná</b>", 
+          font = list(size = 16)
+        ),
+        
+        xaxis = list(
+          title = "Fecha y Hora", 
+          type = 'date', 
+          tickformat = "%d/%m/%Y %H:%M", 
+          showgrid = TRUE
+        ),
+        
+        yaxis = list(
+          title = "Temperatura (°C)", 
+          showgrid = TRUE
+        ),
+        
+        yaxis2 = list(
+          title = "Precipitación (mm)", 
+          overlaying = "y", 
+          side = "right", 
+          showgrid = FALSE
+        ),
+        
+        hovermode = "x unified",
+        
+        legend = list(
+          orientation = 'h', 
+          x = 0.05, 
+          y = -0.2
+        ),
+        
+        # --------------------------------------------------------
+        # FUENTE
+        # --------------------------------------------------------
+        
+        annotations = list(
+          list(
+            text = 'Fuente: <a href="https://www.hidraulica.gob.ar/" target="_blank">Dirección de Hidráulica de Entre Ríos</a>',
+            x = 0,
+            y = -0.35,
+            xref = "paper",
+            yref = "paper",
+            showarrow = FALSE,
+            xanchor = "left",
+            font = list(
+              size = 10
+            )
+          )
+        )
+      )
+    
+})
+  
   
   # ---- TABLA CRÍTICOS ----
   

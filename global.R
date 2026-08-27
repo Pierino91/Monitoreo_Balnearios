@@ -18,6 +18,8 @@ library(DT)
 library(dplyr)
 library(lubridate)
 library(sf)
+library(stringr)
+library(httr)
 
 # ---- CONFIGURACIÓN GLOBAL ----
 MODO <- "produccion"   # "produccion" | "desarrollo"
@@ -35,6 +37,9 @@ INTERVALO_ACTUALIZACION <- 3600  # segundos
 source("R/api_epicollect5.R")
 source("R/normativa.R")
 source("R/semaforo.R")
+source("R/meteorologia.R")
+source("R/data_access_local.R")
+
 # source("R/epicollect5Function.R")
 
 # ---- Complemento ----
@@ -98,3 +103,7 @@ union_tipeo_mapa_datos <- function(df_raw, verbose = FALSE) {
   return(df)
 }
 
+
+
+
+  

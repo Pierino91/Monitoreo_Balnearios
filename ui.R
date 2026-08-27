@@ -15,6 +15,7 @@ ui <- dashboardPage(
       menuItem("Panel Principal", tabName = "dashboard", icon = icon("dashboard")),
       menuItem("Mapa Interactivo", tabName = "mapa", icon = icon("map-marked-alt")),
       menuItem("Series Temporales", tabName = "series", icon = icon("chart-line")),
+      menuItem("Datos Meteorológicos", tabName = "meteorologia", icon = icon("cloud-sun-rain")), 
       menuItem("Tabla Técnica", tabName = "tabla", icon = icon("table")),
       menuItem("Normativa", tabName = "normativa", icon = icon("balance-scale")),
       
@@ -254,11 +255,30 @@ ui <- dashboardPage(
         box(plotlyOutput("grafico_media_geometrica", height = 400), width = 12)
       ),
       
+      
       tabItem(
         tabName = "tabla",
         downloadButton("descargar_csv", "CSV"),
         downloadButton("descargar_excel", "Excel"),
         DTOutput("tabla_completa")
+      ),
+      
+      tabItem(
+        tabName = "meteorologia",
+        box(
+          title = "Monitoreo Meteorológico Continuo (Horario)",
+          status = "primary",
+          solidHeader = TRUE,
+          width = 12,
+          plotlyOutput("grafico_meteo_horario", height = 400)
+        ),
+        box(
+          title = "Resumen Meteorológico Diario",
+          status = "success",
+          solidHeader = TRUE,
+          width = 12,
+          plotlyOutput("grafico_meteo_diario", height = 400)
+        )
       ),
       
       tabItem(
